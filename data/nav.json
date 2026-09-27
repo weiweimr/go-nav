@@ -1,22 +1,30 @@
 {
-  "title": "Go Nav",
-  "name": "Go Nav",
-  "description": "简洁高效的网址导航站",
+  "title": "歪牛导航 - 优质网站资源导航，精选实用网址合集",
+  "name": "歪牛导航",
+  "description": "歪牛导航是开放公共网址导航站，精选各类实用网站、在线工具与资源站点，分类整理优质网址，干净无广告，方便快速查找浏览各类优质网站。",
   "keywords": [
-    "网址导航站",
-    "导航站",
     "网址导航",
-    "个人导航"
+    "网站资源合集",
+    "实用在线工具",
+    "公共导航站",
+    "精选网址",
+    "网站大全",
+    "歪牛导航"
   ],
-  "logo": "/images/logo.svg",
-  "favicon": "/favicon.ico",
-  "author": "dengxiwang",
-  "copyright": "版权所有 © 保留所有权利",
+  "logo": "/img/2026/9/27/63a230bb0666e36724377805.ico",
+  "favicon": "/img/2026/9/27/63a230bb0666e36724377805.ico",
+  "author": "歪牛",
+  "copyright": "版权所有",
   "icp": "苏ICP备2023042432号",
   "beian": "",
   "qrCode": "",
   "qrCodeText": "",
-  "footerLinks": [],
+  "footerLinks": [
+    {
+      "label": "gotab",
+      "href": "https://www.gotab.cn/"
+    }
+  ],
   "themeMode": "system",
   "search": {
     "defaultEngine": "local",
@@ -56,19 +64,24 @@
     "showFloatingActions": true,
     "defaultIconPadding": "8",
     "linkTarget": "new",
-    "enableSiteDetailPage": true
+    "enableSiteDetailPage": true,
+    "autoUseIntranet": false
   },
   "adsAspectRatio": "4/3",
   "homeAdsAspectRatio": "16/9",
   "submission": {
     "enabled": true,
-    "showFloatingButton": true,
+    "showFloatingButton": false,
     "showSidebarButton": true,
-    "staticEmail": "dengxiwang@aliyun.com"
+    "staticEmail": "liubai7541@agent.qq.com"
   },
   "sidebarAdsEnabled": true,
   "homeAdsEnabled": true,
   "accessProtection": {
     "enabled": false
+  },
+  "imageUpload": {
+    "compress": true,
+    "convertToWebp": false
   }
 }
