@@ -5,8 +5,8 @@
   "keywords": [
     "小众宝藏网站导航，冷门好用网站，神仙网站合集，优质小众网站，宝藏网站"
   ],
-  "logo": "/img/2026/9/27/4cb2687cd71ea0e2def08faf.png",
-  "favicon": "/img/2026/9/27/63a230bb0666e36724377805.ico",
+  "logo": "https://t.wainiu.cn/img/2026/11/8/favicon.ico",
+  "favicon": "https://t.wainiu.cn/img/2026/11/8/favicon.ico",
   "author": "歪牛",
   "copyright": "本站所指向第三方网址内容与本站无关，本站不承担任何法律责任",
   "icp": "苏ICP备2023042432号",
@@ -59,15 +59,15 @@
     "defaultIconPadding": "8",
     "linkTarget": "new",
     "enableSiteDetailPage": true,
-    "autoUseIntranet": true,
+    "autoUseIntranet": false,
     "cardStyle": "compact",
     "showSidebar": true
   },
   "adsAspectRatio": "4/3",
   "homeAdsAspectRatio": "16/9",
   "submission": {
-    "enabled": true,
-    "showFloatingButton": true,
+    "enabled": false,
+    "showFloatingButton": false,
     "showSidebarButton": false,
     "staticEmail": "lww_730@qq.com"
   },
