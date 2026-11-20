@@ -1,0 +1,10 @@
+{
+  "name": "go-nav",
+  "entry": "",
+  "installCommand": "pnpm install",
+  "buildCommand": "BUILD_MODE=html pnpm build",
+  "assets": {
+    "directory": "./web",
+    "notFoundStrategy": "404Page"
+  }
+}
