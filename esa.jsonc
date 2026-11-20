@@ -4,7 +4,7 @@
   "installCommand": "pnpm install",
   "buildCommand": "BUILD_MODE=html pnpm build",
   "assets": {
-    "directory": "./web",
+    "directory": "./out",
     "notFoundStrategy": "404Page"
   }
 }
