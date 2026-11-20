@@ -1,0 +1,17 @@
+{
+  // 项目名：与 ESA 控制台里的函数名一致（截图显示 go-nav）
+  "name": "go-nav",
+
+  // 保持与你控制台当前一致：Static 模式 + npm
+  "installCommand": "npm install",
+  "buildCommand": "npm run build:static",
+
+  "assets": {
+    "directory": "./out",
+
+    // 关键：未命中静态文件的「导航请求」回退到 /404.html，
+    // 显示 go-nav 自定义 404 页，而不是 ESA 的裸 404。
+    // out/404.html 由 Next.js 静态导出（app/not-found.tsx）自动生成。
+    "notFoundStrategy": "404Page"
+  }
+}
