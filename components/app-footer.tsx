@@ -94,20 +94,9 @@ export const AppFooter = memo(function AppFooter({
 
 				<div className="mt-8 flex flex-col gap-2 border-t border-black/6 pt-5 text-xs dark:border-white/8 lg:flex-row lg:items-center lg:justify-between">
 					<div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
-						<span>
-							{copyright || `© ${CURRENT_YEAR} ${name}. All rights reserved.`}
-						</span>
-						<span className="inline-flex items-center gap-1 text-xs">
-							Powered by
-							<Link
-								href="https://github.com/dengxiwang/go-nav"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-xs font-semibold no-underline [@media(hover:hover)]:hover:underline [@media(hover:hover)]:hover:text-primary"
-							>
-								Go Nav
-							</Link>
-						</span>
+					<span>
+						{copyright || `© ${CURRENT_YEAR} ${name}. All rights reserved.`}
+					</span>
 					</div>
 					<div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
 						{icp ? (
