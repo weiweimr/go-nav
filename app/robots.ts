@@ -28,3 +28,4 @@ export default function robots(): MetadataRoute.Robots {
 		host: origin,
 	};
 }
+// ESA rebuild trigger 2026-11-21
