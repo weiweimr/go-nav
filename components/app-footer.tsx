@@ -25,8 +25,10 @@ const CURRENT_YEAR = new Date().getFullYear();
  */
 export const AppFooter = memo(function AppFooter({
 	showQrCode = true,
+	showFriendLinks = true,
 }: {
 	showQrCode?: boolean;
+	showFriendLinks?: boolean;
 }) {
 	const name = useAtomValue(navNameAtom);
 	const copyright = useAtomValue(navCopyrightAtom);
@@ -44,7 +46,7 @@ export const AppFooter = memo(function AppFooter({
 			<div>
 				<div className="flex flex-col items-center gap-8 md:flex-row md:items-start md:justify-between">
 					<div className="flex flex-col items-center gap-3 md:items-start">
-						{visibleFooterLinks.length > 0 ? (
+						{showFriendLinks && visibleFooterLinks.length > 0 ? (
 							<>
 								<div className="text-sm font-medium">友情链接</div>
 								<nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 md:justify-start">
@@ -94,6 +96,17 @@ export const AppFooter = memo(function AppFooter({
 					<div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
 						<span>
 							{copyright || `© ${CURRENT_YEAR} ${name}. All rights reserved.`}
+						</span>
+						<span className="inline-flex items-center gap-1 text-xs">
+							Powered by
+							<Link
+								href="https://github.com/dengxiwang/go-nav"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="text-xs font-semibold no-underline [@media(hover:hover)]:hover:underline [@media(hover:hover)]:hover:text-primary"
+							>
+								Go Nav
+							</Link>
 						</span>
 					</div>
 					<div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">

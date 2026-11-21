@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAtomValue, useSetAtom } from "jotai";
 import { HeaderBundle } from "./header-bundle";
 import { AppSidebar } from "./app-sidebar";
@@ -50,11 +50,12 @@ const SiteDetailPage = dynamic(() =>
  */
 export function AppLayout({
 	deploymentMode,
+	detailSlugOverride = null,
 }: {
 	deploymentMode: SubmissionDeploymentMode;
+	detailSlugOverride?: string | null;
 }) {
 	const pathname = usePathname();
-	const searchParams = useSearchParams();
 	const layout = useAtomValue(layoutAtom);
 	const categories = useAtomValue(categoriesAtom);
 	const homeAds = useAtomValue(homeAdsAtom);
@@ -95,8 +96,7 @@ export function AppLayout({
 			pathname,
 			categories,
 			detailEnabled: layout.enableSiteDetailPage,
-			detailSlugOverride:
-				deploymentMode === "html" ? searchParams.get("site") : null,
+			detailSlugOverride,
 			setActiveId,
 		});
 	const hasDesktopSidebar = layout.showSidebar && displayCategories.length > 0;
@@ -160,7 +160,10 @@ export function AppLayout({
 					</main>
 
 					{layout.showFooter && (
-						<AppFooter showQrCode={layout.showFooterQrCode} />
+						<AppFooter
+							showQrCode={layout.showFooterQrCode}
+							showFriendLinks={!isDetailRoute}
+						/>
 					)}
 				</div>
 			</div>

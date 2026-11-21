@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { getNav, getWebsiteData } from "@/lib/config";
+import { buildDetailJsonLd, buildDetailMetadata } from "@/lib/seo";
 import {
 	collectSiteDetailEntries,
 	findSiteDetailEntryBySlug,
@@ -36,6 +38,27 @@ export function generateStaticParams() {
 	}));
 }
 
+export async function generateMetadata({
+	params,
+}: SiteDetailRouteProps): Promise<Metadata> {
+	const { slug } = await params;
+	const noIndex: Metadata = { robots: { index: false, follow: false } };
+
+	if (isHtmlDeployment || slug === STATIC_PLACEHOLDER_SLUG) return noIndex;
+	if (isServerDeployment && !(await readSiteAccessStatus()).allowed) {
+		return noIndex;
+	}
+
+	const nav = getNav();
+	if (nav.layout?.enableSiteDetailPage !== true) return noIndex;
+
+	const entries = collectSiteDetailEntries(getWebsiteData().categories);
+	const matched = findSiteDetailEntryBySlug(entries, slug);
+	if (!matched) return noIndex;
+
+	return buildDetailMetadata(nav, matched);
+}
+
 export default async function SiteDetailRoute(props: SiteDetailRouteProps) {
 	const { slug } = await props.params;
 	if (isHtmlDeployment) {
@@ -59,5 +82,13 @@ export default async function SiteDetailRoute(props: SiteDetailRouteProps) {
 		redirect(matched.path);
 	}
 
-	return null;
+	const jsonLd = buildDetailJsonLd(nav, matched);
+	if (!jsonLd) return null;
+
+	return (
+		<script
+			type="application/ld+json"
+			dangerouslySetInnerHTML={{ __html: jsonLd }}
+		/>
+	);
 }

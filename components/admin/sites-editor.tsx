@@ -1,5 +1,8 @@
 "use client";
 
+import { useScrollContainment } from "@/hooks/use-scroll-containment";
+import { useOverlayAfterClose } from "@/hooks/use-overlay-after-close";
+
 import {
     Button,
     Chip,
@@ -77,6 +80,7 @@ import {
     normalizeSitePreviewImages,
 } from "@/lib/site-detail";
 import { SiteDetailMarkdown } from "@/components/app-layout/site-detail-markdown";
+import { TableShell } from "@/components/ui/table-shell";
 import { IconPicker } from "./icon-picker";
 import {
     resolveConfiguredValue,
@@ -84,6 +88,11 @@ import {
     toPx,
 } from "../site-icon";
 import Loading from "./loading";
+
+// 预览图仅在卡片/详情页展示，强制限制长边并压缩，避免上传原图长期占用仓库与静态产物空间。
+// 与服务端截图抓取（capturePreview：1280×900 WebP q80）保持一致的资源上限。
+const PREVIEW_IMAGE_MAX_EDGE = 1280;
+const PREVIEW_IMAGE_QUALITY = 0.8;
 
 interface FlatCategory {
 	category: NavCategory;
@@ -587,7 +596,6 @@ function PreviewImagePicker({
 }) {
 	const fileRef = useRef<HTMLInputElement>(null);
 	const [uploading, setUploading] = useState(false);
-	const nav = useAtomValue(navAtom);
 
 	const onFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
 		const f = e.target.files?.[0];
@@ -600,9 +608,11 @@ function PreviewImagePicker({
 		setUploading(true);
 		try {
 			const url = await uploadImageWithCompression(f, {
-				quality: 0.84,
-				compress: nav.imageUpload?.compress === true,
-				forceWebp: nav.imageUpload?.convertToWebp === true,
+				quality: PREVIEW_IMAGE_QUALITY,
+				// 预览图始终压缩并限制长边，不受全局图片开关影响，减小存储占用。
+				maxEdge: PREVIEW_IMAGE_MAX_EDGE,
+				compress: true,
+				forceWebp: true,
 				fileNamePrefix: "preview",
 			});
 			onChange(url);
@@ -694,7 +704,6 @@ function DetailPreviewImagesPicker({
 	const fileRef = useRef<HTMLInputElement>(null);
 	const [urlDraft, setUrlDraft] = useState("");
 	const [uploading, setUploading] = useState(false);
-	const nav = useAtomValue(navAtom);
 	const images = normalizeSitePreviewImages(value);
 	const remaining = MAX_SITE_DETAIL_PREVIEW_IMAGES - images.length;
 
@@ -740,9 +749,11 @@ function DetailPreviewImagesPicker({
 		try {
 			for (const file of selectedFiles) {
 				const url = await uploadImageWithCompression(file, {
-					quality: 0.84,
-					compress: nav.imageUpload?.compress === true,
-					forceWebp: nav.imageUpload?.convertToWebp === true,
+					quality: PREVIEW_IMAGE_QUALITY,
+					// 预览图始终压缩并限制长边，不受全局图片开关影响，减小存储占用。
+					maxEdge: PREVIEW_IMAGE_MAX_EDGE,
+					compress: true,
+					forceWebp: true,
 					fileNamePrefix: "detail-preview",
 				});
 				uploaded.push(url);
@@ -940,6 +951,8 @@ function DetailMarkdownEditor({
 }
 
 export function SitesEditor() {
+	const categoryScrollRef = useScrollContainment<HTMLDivElement>();
+	const contentScrollRef = useScrollContainment<HTMLDivElement>();
 	const [categories, setCategories] = useAtom(categoriesAtom);
 	const nav = useAtomValue(navAtom);
 	const value: WebsiteData = { categories };
@@ -959,8 +972,18 @@ export function SitesEditor() {
 		string | null
 	>(null);
 	const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+	const [deleteTargetName, setDeleteTargetName] = useState("");
 	const [fetchingInfo, setFetchingInfo] = useState(false);
 	const [capturingPreview, setCapturingPreview] = useState(false);
+	const editingSessionRef = useRef(0);
+	const editingOverlayRef = useOverlayAfterClose(isModalOpen, () => {
+		setEditingSite(null);
+		setEditingIndex(-1);
+		setEditingCategoryId(null);
+		setEditingSourceCategoryId(null);
+		setFetchingInfo(false);
+		setCapturingPreview(false);
+	});
 	const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() =>
 		collectExpandableIds(categories),
 	);
@@ -1276,14 +1299,14 @@ export function SitesEditor() {
 	};
 
 	const closeSiteModal = () => {
+		editingSessionRef.current += 1;
 		setIsModalOpen(false);
-		setEditingSite(null);
-		setEditingIndex(-1);
-		setEditingCategoryId(null);
-		setEditingSourceCategoryId(null);
 	};
 
 	const openAddModal = () => {
+		editingSessionRef.current += 1;
+		setFetchingInfo(false);
+		setCapturingPreview(false);
 		setEditingSite({
 			title: "",
 			description: "",
@@ -1304,6 +1327,9 @@ export function SitesEditor() {
 	};
 
 	const openEditModal = (site: NavSite, index: number) => {
+		editingSessionRef.current += 1;
+		setFetchingInfo(false);
+		setCapturingPreview(false);
 		setEditingSite({ ...site });
 		setEditingIndex(index);
 		setEditingCategoryId(selectedCategory);
@@ -1312,7 +1338,7 @@ export function SitesEditor() {
 	};
 
 	const saveSite = async () => {
-		if (!editingSite) return;
+		if (!isModalOpen || !editingSite) return;
 		if (!editingSite.title.trim()) {
 			toast.warning("网站名称不能为空");
 			return;
@@ -1387,6 +1413,8 @@ export function SitesEditor() {
 	};
 
 	const fetchWebsiteInfo = async () => {
+		if (!isModalOpen) return;
+		const session = editingSessionRef.current;
 		if (!editingSite?.url?.trim()) {
 			toast.warning("请先输入网站地址");
 			return;
@@ -1409,6 +1437,7 @@ export function SitesEditor() {
 				keywords?: string[];
 			};
 
+			if (session !== editingSessionRef.current) return;
 			setEditingSite((prev) => {
 				if (!prev) return prev;
 				const updated = { ...prev };
@@ -1429,13 +1458,17 @@ export function SitesEditor() {
 
 			toast.success("网站信息获取成功");
 		} catch (e) {
-			toast.warning((e as Error).message || "获取网站信息失败");
+			if (session === editingSessionRef.current) {
+				toast.warning((e as Error).message || "获取网站信息失败");
+			}
 		} finally {
-			setFetchingInfo(false);
+			if (session === editingSessionRef.current) setFetchingInfo(false);
 		}
 	};
 
 	const captureWebsitePreview = async () => {
+		if (!isModalOpen) return;
+		const session = editingSessionRef.current;
 		if (!editingSite?.url?.trim()) {
 			toast.warning("请先输入网站地址");
 			return;
@@ -1452,15 +1485,23 @@ export function SitesEditor() {
 				throw new Error(data.error || "获取预览图失败");
 			}
 			const data = (await res.json()) as { url: string };
+			if (session !== editingSessionRef.current) return;
 			setEditingSite((prev) =>
 				prev ? { ...prev, previewImage: data.url } : prev,
 			);
 			toast.success("预览图获取成功");
 		} catch (e) {
-			toast.warning((e as Error).message || "获取预览图失败");
+			if (session === editingSessionRef.current) {
+				toast.warning((e as Error).message || "获取预览图失败");
+			}
 		} finally {
-			setCapturingPreview(false);
+			if (session === editingSessionRef.current) setCapturingPreview(false);
 		}
+	};
+
+	const requestDeleteSite = (index: number | null) => {
+		if (index !== null) setDeleteTargetName(currentSites[index]?.title ?? "");
+		setDeleteTarget(index);
 	};
 
 	const deleteSite = (index: number) => {
@@ -1591,7 +1632,7 @@ export function SitesEditor() {
 						<div className="border-b border-gray-100 px-4 py-3 dark:border-neutral-800">
 							<h3 className="text-sm font-semibold">选择分类</h3>
 						</div>
-						<div className="flex-1 overflow-y-auto p-2 overscroll-none">
+						<div ref={categoryScrollRef} className="flex-1 overflow-y-auto p-2">
 							{renderCategoryList("desktop")}
 						</div>
 					</div>
@@ -1610,7 +1651,7 @@ export function SitesEditor() {
 								</Button>
 							</div>
 						) : (
-							<div className="flex h-full flex-col gap-4 overflow-y-scroll overscroll-none p-1 -m-1">
+							<div ref={contentScrollRef} className="flex h-full flex-col gap-4 overflow-y-auto p-1 -m-1">
 								<div className="flex flex-col gap-4 flex-wrap sm:flex-row sm:items-center sm:justify-between">
 									<div className="flex items-center gap-2 pt-1">
 										<span className="truncate font-medium text-lg!">
@@ -1673,7 +1714,7 @@ export function SitesEditor() {
 											items={sortableSiteIds}
 											strategy={verticalListSortingStrategy}
 										>
-											<Table variant="secondary" aria-label="网址列表">
+											<TableShell variant="secondary" aria-label="网址列表" stickyScrollbar>
 												<Table.ScrollContainer>
 													<Table.Content aria-label="网址列表">
 														<Table.Header>
@@ -1724,7 +1765,7 @@ export function SitesEditor() {
 																		currentSites={currentSites}
 																		moveSite={moveSite}
 																		openEditModal={openEditModal}
-																		setDeleteTarget={setDeleteTarget}
+																		setDeleteTarget={requestDeleteSite}
 																		defaultIconPadding={defaultIconPadding}
 																		autoUseIntranet={autoUseIntranet}
 																		registerRowElement={registerRowElement}
@@ -1737,7 +1778,7 @@ export function SitesEditor() {
 														</Table.Body>
 													</Table.Content>
 												</Table.ScrollContainer>
-											</Table>
+											</TableShell>
 										</SortableContext>
 									)}
 								</div>
@@ -1773,6 +1814,7 @@ export function SitesEditor() {
 				</Drawer.Backdrop>
 
 				<Modal.Backdrop
+					ref={editingOverlayRef}
 					isOpen={isModalOpen}
 					onOpenChange={(open) => !open && closeSiteModal()}
 				>
@@ -1789,6 +1831,7 @@ export function SitesEditor() {
 									<Select
 										className="w-full"
 										placeholder="选择分类"
+										isRequired
 										value={editingCategoryId}
 										onChange={(value) =>
 											setEditingCategoryId(value ? String(value) : null)
@@ -1818,6 +1861,7 @@ export function SitesEditor() {
 										</Select.Popover>
 									</Select>
 									<TextField
+										isRequired
 										value={editingSite?.url ?? ""}
 										onChange={(v) =>
 											setEditingSite({ ...editingSite!, url: v })
@@ -1888,6 +1932,7 @@ export function SitesEditor() {
 										“网站信息”更新名称、描述、标签和图标；“预览图”只抓取网站首屏截图。
 									</p>
 									<TextField
+										isRequired
 										value={editingSite?.title ?? ""}
 										onChange={(v) =>
 											setEditingSite({ ...editingSite!, title: v })
@@ -2008,7 +2053,7 @@ export function SitesEditor() {
 							</AlertDialog.Header>
 							<AlertDialog.Body>
 								<p>
-									删除 <strong>{currentSites[deleteTarget ?? 0]?.title}</strong>{" "}
+									删除 <strong>{deleteTargetName}</strong>{" "}
 									后，该网址数据将被永久删除，此操作不可撤销。
 								</p>
 							</AlertDialog.Body>

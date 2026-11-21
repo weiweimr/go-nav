@@ -1,5 +1,8 @@
 "use client";
 
+import { useScrollContainment } from "@/hooks/use-scroll-containment";
+import { useOverlayAfterClose } from "@/hooks/use-overlay-after-close";
+
 import { Button, Modal, toast } from "@heroui/react";
 import { useRef, useState } from "react";
 import { BiCheck, BiDownload, BiTrash, BiUpload } from "react-icons/bi";
@@ -40,6 +43,7 @@ function createBackupUploadId(): string {
 }
 
 export function BackupEditor() {
+	const orphanListScrollRef = useScrollContainment<HTMLDivElement>();
 	const [importing, setImporting] = useState(false);
 	const [importProgress, setImportProgress] = useState<number | null>(null);
 	const [exporting, setExporting] = useState(false);
@@ -49,6 +53,8 @@ export function BackupEditor() {
 	const [scanning, setScanning] = useState(false);
 	const [cleaning, setCleaning] = useState(false);
 	const [preview, setPreview] = useState<CleanupPreview | null>(null);
+	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+	const previewOverlayRef = useOverlayAfterClose(isPreviewOpen, () => setPreview(null));
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const handleDownload = async () => {
@@ -174,6 +180,7 @@ export function BackupEditor() {
 				total: d.total ?? 0,
 				orphanCount: d.orphanCount ?? (d.orphans?.length ?? 0),
 			});
+			setIsPreviewOpen(true);
 		} catch (e) {
 			toast.danger((e as Error).message);
 		} finally {
@@ -182,7 +189,7 @@ export function BackupEditor() {
 	};
 
 	const handleConfirmCleanup = async () => {
-		if (cleaning) return;
+		if (!isPreviewOpen || !preview || preview.orphanCount === 0 || cleaning) return;
 		setCleaning(true);
 		try {
 			const res = await fetch("/api/backup/cleanup/", { method: "POST" });
@@ -200,7 +207,7 @@ export function BackupEditor() {
 			} else {
 				toast.success(`已清理 ${d.deletedCount ?? 0} 个无用素材`);
 			}
-			setPreview(null);
+			setIsPreviewOpen(false);
 		} catch (e) {
 			toast.danger((e as Error).message);
 		} finally {
@@ -335,8 +342,9 @@ export function BackupEditor() {
 
 			{/* 清理预览确认弹窗 */}
 				<Modal.Backdrop
-					isOpen={preview !== null}
-					onOpenChange={(open) => !open && !cleaning && setPreview(null)}
+					ref={previewOverlayRef}
+					isOpen={isPreviewOpen}
+					onOpenChange={(open) => !open && !cleaning && setIsPreviewOpen(false)}
 				>
 					<Modal.Container>
 						<Modal.Dialog>
@@ -358,7 +366,7 @@ export function BackupEditor() {
 												没有发现可清理的无用素材。
 											</p>
 										) : (
-											<div className="max-h-64 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs dark:border-neutral-800 dark:bg-neutral-950">
+											<div ref={orphanListScrollRef} className="max-h-64 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-2 text-xs dark:border-neutral-800 dark:bg-neutral-950">
 												<ul className="flex flex-col gap-1 font-mono text-gray-700 dark:text-neutral-300">
 													{preview.orphans.map((name) => (
 														<li key={name} className="truncate">
@@ -378,7 +386,7 @@ export function BackupEditor() {
 								<Button
 									variant="outline"
 									isDisabled={cleaning}
-									onPress={() => setPreview(null)}
+									onPress={() => setIsPreviewOpen(false)}
 								>
 									取消
 								</Button>

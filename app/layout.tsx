@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getNav } from "@/lib/config";
+import { buildRootMetadata, resolveSiteOrigin } from "@/lib/seo";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppToastProvider } from "@/components/app-toast-provider";
 import { FocusRingGuard } from "@/components/focus-ring-guard";
+import { PageNavigationProvider } from "@/components/page-navigation";
 
 const isHtmlDeployment =
 	(process.env.BUILD_MODE || "server").toLowerCase() === "html";
@@ -16,29 +18,14 @@ export const viewport: Viewport = {
 export function generateMetadata(): Metadata {
 	if (isHtmlDeployment) {
 		return {
+			metadataBase: new URL(resolveSiteOrigin()),
 			title: "Go Nav",
 			description: "Go Nav HTML runtime configuration",
+			alternates: { canonical: "/" },
 		};
 	}
 
-	const nav = getNav();
-	const other: Metadata["other"] = {};
-	if (nav.copyright) {
-		other.copyright = nav.copyright;
-	}
-
-	return {
-		title: nav.title,
-		description: nav.description,
-		keywords: nav.keywords,
-		authors: nav.author ? [{ name: nav.author }] : undefined,
-		icons: nav.favicon ? { icon: nav.favicon } : undefined,
-		robots:
-			nav.accessProtection?.enabled === true
-				? { index: false, follow: false }
-				: undefined,
-		other: Object.keys(other).length > 0 ? other : undefined,
-	};
+	return buildRootMetadata(getNav());
 }
 
 /**
@@ -90,7 +77,7 @@ export default function RootLayout({
 			<body className="min-h-full flex flex-col">
 								<ThemeProvider mode={themeMode}>
 										<FocusRingGuard />
-										{children}
+										<PageNavigationProvider>{children}</PageNavigationProvider>
 										<AppToastProvider />
 								</ThemeProvider>
 						</body>

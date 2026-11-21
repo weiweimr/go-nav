@@ -1,4 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+	title: "页面未找到",
+	robots: { index: false, follow: false },
+};
 
 export default function NotFound() {
 	return (
@@ -6,10 +12,10 @@ export default function NotFound() {
 			<div className="flex flex-col items-center gap-6 text-center">
 				<div className="flex flex-col items-center gap-2">
 					<span className="text-8xl font-bold text-primary/20">404</span>
-					<h1 className="text-xl font-semibold">页面未找到</h1>
+					<h1 className="text-xl font-semibold">网址未找到</h1>
 				</div>
 				<p className="max-w-sm text-sm text-muted">
-					抱歉，您访问的页面不存在或已被移除。
+					抱歉，您访问的网址不存在或已被移除。
 				</p>
 				<Link
 					href="/"

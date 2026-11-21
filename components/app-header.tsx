@@ -73,3 +73,4 @@ export const AppHeader = memo(function AppHeader({
 		</header>
 	);
 });
+

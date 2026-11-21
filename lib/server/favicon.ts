@@ -10,11 +10,55 @@ const REQUEST_TIMEOUT = 15_000;
 const MAX_FAVICON_CANDIDATES = 6;
 const DATA_URL_IMAGE_RE =
 	/^data:image\/([^;]+);base64,([a-z0-9+/=\s]+)$/i;
+const CHALLENGE_SCAN_LIMIT = 64 * 1024;
+
+/**
+ * 机器验证 / WAF 拦截页的常见特征。
+ * 命中任意一个即可认为抓到的 HTML 不是站点真实内容。
+ */
+const CHALLENGE_PATTERNS: RegExp[] = [
+	/just a moment\.\.\./i,
+	/attention required\s*!?\s*\|\s*cloudflare/i,
+	/sorry, you have been blocked/i,
+	/cf-browser-verification/i,
+	/cf_chl_opt/i,
+	/challenge-platform/i,
+	/verify you are human/i,
+	/checking your browser before accessing/i,
+	/enable javascript and cookies to continue/i,
+	/please complete (?:the )?security check/i,
+	/请开启\s*javascript|请完成安全验证|滑动验证|人机验证|访问验证/i,
+	/<title[^>]*>[^<]*captcha/i,
+];
 
 interface FaviconCandidate {
 	href: string;
 	sizes: string;
 	type: string;
+}
+
+/**
+ * 判断抓取到的 HTML 是否为机器验证 / WAF 拦截页。
+ * 只扫描前 64KB，避免对大页面做无谓的全量匹配。
+ */
+export function isChallengePage(html: string): boolean {
+	const sample = html.slice(0, CHALLENGE_SCAN_LIMIT);
+	return CHALLENGE_PATTERNS.some((pattern) => pattern.test(sample));
+}
+
+/**
+ * 构造「域名级」图标回退地址。
+ *
+ * 机器验证站点通常只拦截页面 HTML 与同源静态资源，第三方图标缓存服务
+ * （favicon.im）按域名即可返回图标，不依赖目标站可访问。
+ * 返回数组便于以后扩展更多回退源。
+ */
+export function buildFaviconFallbackUrls(host: string): string[] {
+	const hostname = host.trim().toLowerCase().replace(/\.$/, "");
+	if (!hostname || hostname === "localhost" || !hostname.includes(".")) {
+		return [];
+	}
+	return [`https://favicon.im/${encodeURIComponent(hostname)}`];
 }
 
 export interface SaveFaviconOptions {

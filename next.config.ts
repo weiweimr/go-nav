@@ -31,6 +31,18 @@ const nextConfig: NextConfig = {
 				...(isHtml ? { distDir: "web" } : {}),
 			}
 		: { output: "standalone" as const }),
+	// 动态后台入口在渲染外壳前跳转，避免先输出 dashboard 再流式重定向。
+	...(!isExport
+		? {
+				redirects: async () => [
+					{
+						source: "/admin/",
+						destination: "/admin/categories/",
+						permanent: false,
+					},
+				],
+			}
+		: {}),
 	env: {
 		NEXT_PUBLIC_DEPLOYMENT_MODE: isHtml
 			? "html"
@@ -51,6 +63,8 @@ const nextConfig: NextConfig = {
 		},
 	},
 	experimental: {
+		// 开发模式将 React 调试信息内联到 RSC，避免独立 WebSocket 调试流挂起时阻塞页面水合。
+		reactDebugChannel: false,
 		optimizePackageImports: ["@heroui/react"],
 	},
 	// 允许在开发模式下通过局域网 IP 访问（Server Action 跨域限制）
@@ -62,7 +76,7 @@ const nextConfig: NextConfig = {
 		remotePatterns: [
 			{
 				protocol: "https",
-				hostname: "www.gotab.cn",
+				hostname: "www.wainiu.cn",
 			},
 		],
 	},

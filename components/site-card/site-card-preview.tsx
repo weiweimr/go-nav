@@ -1,5 +1,8 @@
 "use client";
 
+import { useAtomValue } from "jotai";
+import { getThumbnailUrl, resolveImageThumbnailConfig } from "@/lib/image-thumbnail";
+import { siteNavAtom } from "@/lib/store/site";
 import {
 	CARD_TRANSITION_CLASS,
 	FOCUS_RING_CLASS,
@@ -17,6 +20,10 @@ export function PreviewSiteCard({
 	site,
 	navigation,
 }: SiteCardVisualProps) {
+	const thumbnailConfig = resolveImageThumbnailConfig(useAtomValue(siteNavAtom));
+	const previewSrc = site.previewImage
+		? getThumbnailUrl(site.previewImage, thumbnailConfig, "card")
+		: "";
 	return (
 		<SiteCardLinkShell
 			ariaLabel={site.title}
@@ -48,11 +55,15 @@ export function PreviewSiteCard({
 						{site.previewImage ? (
 							// eslint-disable-next-line @next/next/no-img-element
 							<img
-								src={site.previewImage}
+								src={previewSrc}
 								alt=""
 								loading="lazy"
 								decoding="async"
 								className="h-full w-full object-cover"
+								onError={(event) => {
+									const img = event.currentTarget;
+									if (img.src !== site.previewImage) img.src = site.previewImage!;
+								}}
 							/>
 						) : null}
 					</div>

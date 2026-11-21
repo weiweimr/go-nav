@@ -32,6 +32,28 @@ export interface ImageUploadConfig {
 }
 
 /**
+ * 图片缩略图配置（CDN 动态缩图）。
+ *
+ * 仅对 hosts 白名单中的 CDN 域名图片追加缩略参数（七牛 imageView2），
+ * 外部图床图片保持原样，避免拼出无效 URL。只影响展示，不影响原图放大。
+ */
+export interface ImageThumbnailConfig {
+	/** 是否启用动态缩图，默认 false */
+	enabled?: boolean;
+	/**
+	 * 允许缩图的 CDN 主机名白名单（不含协议与端口），如 ["t.wainiu.cn"]。
+	 * 留空时不处理任何图片。
+	 */
+	hosts?: string[];
+	/** 缩略图质量 1-100，默认 80 */
+	quality?: number;
+	/** 详情页画廊卡片展示宽度（CSS 像素），默认 640 */
+	galleryWidth?: number;
+	/** 首页预览卡片展示宽度（CSS 像素），默认 480 */
+	cardWidth?: number;
+}
+
+/**
  * 布局与显示配置
  */
 export interface LayoutConfig {
@@ -395,6 +417,8 @@ export interface NavConfig {
 	recentVisitsMax?: number;
 	/** 图片上传处理策略 */
 	imageUpload?: ImageUploadConfig;
+	/** CDN 动态缩图配置（仅展示位生效，放大查看仍用原图） */
+	imageThumbnail?: ImageThumbnailConfig;
 	/** 自定义代码插件列表（自定义 CSS / JS 注入） */
 	plugins?: PluginConfig[];
 }

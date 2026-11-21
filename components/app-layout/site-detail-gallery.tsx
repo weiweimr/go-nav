@@ -4,6 +4,7 @@ import { Button, Modal } from "@heroui/react";
 import {
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
     type CSSProperties,
@@ -21,6 +22,10 @@ import {
 } from "react-icons/bi";
 import { Autoplay, Keyboard } from "swiper/modules";
 import { Swiper, SwiperSlide, type SwiperClass } from "swiper/react";
+import { useAtomValue } from "jotai";
+import { useOverlayAfterClose } from "@/hooks/use-overlay-after-close";
+import { siteNavAtom } from "@/lib/store/site";
+import { getThumbnailUrl, resolveImageThumbnailConfig } from "@/lib/image-thumbnail";
 
 interface GalleryCardProps {
 	isAccessible: boolean;
@@ -28,6 +33,8 @@ interface GalleryCardProps {
 	onOpen: () => void;
 	originalIndex: number;
 	src: string;
+	/** 展示用缩略图 URL；加载失败时回退到 src 原图 */
+	thumbnailSrc: string;
 	title: string;
 }
 
@@ -123,12 +130,44 @@ function getPointerDistance(first: ViewerPoint, second: ViewerPoint) {
 	return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
+/** 缩略图展示：加载失败时自动回退原图，保证 CDN 不支持缩略参数时仍可显示。 */
+function ThumbnailImage({
+	src,
+	fallbackSrc,
+	alt,
+	className,
+	loading,
+}: {
+	src: string;
+	fallbackSrc: string;
+	alt: string;
+	className: string;
+	loading?: "eager" | "lazy";
+}) {
+	const [currentSrc, setCurrentSrc] = useState(src);
+	useEffect(() => setCurrentSrc(src), [src]);
+	return (
+		// eslint-disable-next-line @next/next/no-img-element
+		<img
+			src={currentSrc}
+			alt={alt}
+			loading={loading}
+			decoding="async"
+			className={className}
+			onError={() => {
+				if (currentSrc !== fallbackSrc) setCurrentSrc(fallbackSrc);
+			}}
+		/>
+	);
+}
+
 function GalleryCard({
 	isAccessible,
 	isEager,
 	onOpen,
 	originalIndex,
 	src,
+	thumbnailSrc,
 	title,
 }: GalleryCardProps) {
 	return (
@@ -142,12 +181,11 @@ function GalleryCard({
 		>
 			<span className="block h-full overflow-hidden rounded-xl bg-white">
 				{/* 动态配置允许任意远程图床，无法预先写入 Next Image remotePatterns。 */}
-				{/* eslint-disable-next-line @next/next/no-img-element */}
-				<img
-					src={src}
+				<ThumbnailImage
+					src={thumbnailSrc}
+					fallbackSrc={src}
 					alt={`${title} 预览图 ${originalIndex + 1}`}
 					loading={isEager ? "eager" : "lazy"}
-					decoding="async"
 					className="h-full w-full object-contain transition-transform duration-300 group-hover/image:scale-[1.015]"
 				/>
 			</span>
@@ -198,6 +236,7 @@ export function SiteDetailGallery({
 	} | null>(null);
 	const [activeIndex, setActiveIndex] = useState(0);
 	const [isWideLayout, setIsWideLayout] = useState(false);
+	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 	const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 	const [viewerTransitionDirection, setViewerTransitionDirection] =
 		useState<ViewerTransitionDirection>("initial");
@@ -206,7 +245,16 @@ export function SiteDetailGallery({
 	const canNavigate = hasMultipleImages && (!isWideLayout || total > 2);
 	const initialVisibleStart = 0;
 	const initialVisibleEnd = Math.min(2, total);
-	const serverPreviewImages = images.slice(0, Math.min(2, total));
+	const nav = useAtomValue(siteNavAtom);
+	const thumbnailConfig = resolveImageThumbnailConfig(nav);
+	// 展示位用缩略图，放大查看（viewer 大图）仍用 images 里的原图。
+	const galleryThumbnails = useMemo(
+		() => images.map((src) => getThumbnailUrl(src, thumbnailConfig, "gallery")),
+		[images, thumbnailConfig],
+	);
+	const serverPreviewImages = images
+		.slice(0, Math.min(2, total))
+		.map((src, index) => galleryThumbnails[index]);
 	const swiperLayoutStyle = {
 		position: "absolute",
 		inset: 0,
@@ -324,6 +372,10 @@ export function SiteDetailGallery({
 		},
 		[commitViewerTransform, setViewerDragging],
 	);
+	const previewBackdropRef = useOverlayAfterClose(isPreviewOpen, () => {
+		setPreviewIndex(null);
+		resetViewer(false);
+	});
 	const zoomViewerAt = useCallback(
 		(nextZoom: number, focalX = 0, focalY = 0, animate = false) => {
 			commitViewerTransform((current) => {
@@ -360,10 +412,11 @@ export function SiteDetailGallery({
 	const openPreview = useCallback((index: number) => {
 		setViewerTransitionDirection("initial");
 		setPreviewIndex(index);
+		setIsPreviewOpen(true);
 	}, []);
 	const selectPreview = useCallback(
 		(index: number) => {
-			if (previewIndex === index) return;
+			if (!isPreviewOpen || previewIndex === index) return;
 			setViewerTransitionDirection(
 				previewIndex === null
 					? "initial"
@@ -373,18 +426,18 @@ export function SiteDetailGallery({
 			);
 			setPreviewIndex(index);
 		},
-		[previewIndex],
+		[isPreviewOpen, previewIndex],
 	);
 	const showPreviousPreview = useCallback(() => {
-		if (previewIndex === null || previewIndex <= 0) return;
+		if (!isPreviewOpen || previewIndex === null || previewIndex <= 0) return;
 		setViewerTransitionDirection("previous");
 		setPreviewIndex(previewIndex - 1);
-	}, [previewIndex]);
+	}, [isPreviewOpen, previewIndex]);
 	const showNextPreview = useCallback(() => {
-		if (previewIndex === null || previewIndex >= total - 1) return;
+		if (!isPreviewOpen || previewIndex === null || previewIndex >= total - 1) return;
 		setViewerTransitionDirection("next");
 		setPreviewIndex(previewIndex + 1);
-	}, [previewIndex, total]);
+	}, [isPreviewOpen, previewIndex, total]);
 	const stopViewerThumbnailMomentum = useCallback(() => {
 		if (viewerThumbnailMomentumFrameRef.current === null) return;
 		cancelAnimationFrame(viewerThumbnailMomentumFrameRef.current);
@@ -420,7 +473,19 @@ export function SiteDetailGallery({
 	);
 
 	useEffect(() => {
-		if (previewIndex === null) return;
+		if (isPreviewOpen) return;
+		stopViewerThumbnailMomentum();
+		viewerThumbnailDragRef.current = null;
+		viewerThumbnailSuppressClickRef.current = false;
+		viewerDragRef.current = null;
+		viewerPinchRef.current = null;
+		viewerSwipeRef.current = null;
+		viewerPointersRef.current.clear();
+		setViewerDragging(false);
+	}, [isPreviewOpen, setViewerDragging, stopViewerThumbnailMomentum]);
+
+	useEffect(() => {
+		if (!isPreviewOpen || previewIndex === null) return;
 		stopViewerThumbnailMomentum();
 		let centerFrame: number | null = null;
 		const centerActiveThumbnail = (behavior: ScrollBehavior) => {
@@ -448,7 +513,7 @@ export function SiteDetailGallery({
 			if (centerFrame !== null) cancelAnimationFrame(centerFrame);
 			observer.disconnect();
 		};
-	}, [previewIndex, stopViewerThumbnailMomentum]);
+	}, [isPreviewOpen, previewIndex, stopViewerThumbnailMomentum]);
 
 	useEffect(() => {
 		const autoplay = swiperRef.current?.autoplay;
@@ -467,7 +532,7 @@ export function SiteDetailGallery({
 	}, [previewIndex]);
 
 	useEffect(() => {
-		resetViewer(false);
+		if (previewIndex !== null) resetViewer(false);
 	}, [previewIndex, resetViewer]);
 
 	useEffect(
@@ -481,7 +546,7 @@ export function SiteDetailGallery({
 	);
 
 	useEffect(() => {
-		if (previewIndex === null) return;
+		if (!isPreviewOpen || previewIndex === null) return;
 		const syncViewerBounds = () => {
 			updateViewerLayout();
 			commitViewerTransform((current) => current);
@@ -494,10 +559,10 @@ export function SiteDetailGallery({
 			window.removeEventListener("resize", syncViewerBounds);
 			window.visualViewport?.removeEventListener("resize", syncViewerBounds);
 		};
-	}, [commitViewerTransform, previewIndex, updateViewerLayout]);
+	}, [commitViewerTransform, isPreviewOpen, previewIndex, updateViewerLayout]);
 
 	useEffect(() => {
-		if (previewIndex === null) return;
+		if (!isPreviewOpen || previewIndex === null) return;
 		const stage = viewerStageRef.current;
 		if (!stage) return;
 
@@ -627,6 +692,7 @@ export function SiteDetailGallery({
 		};
 	}, [
 		commitViewerTransform,
+		isPreviewOpen,
 		previewIndex,
 		showNextPreview,
 		showPreviousPreview,
@@ -634,7 +700,7 @@ export function SiteDetailGallery({
 	]);
 
 	useEffect(() => {
-		if (previewIndex === null) return;
+		if (!isPreviewOpen || previewIndex === null) return;
 		const handleKeyDown = (event: KeyboardEvent) => {
 			switch (event.key) {
 				case "ArrowLeft":
@@ -668,6 +734,7 @@ export function SiteDetailGallery({
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [
+		isPreviewOpen,
 		previewIndex,
 		resetViewer,
 		rotateViewer,
@@ -700,14 +767,15 @@ export function SiteDetailGallery({
 								key={`${src}-server-${originalIndex}`}
 								className="site-detail-gallery__server-item min-w-0"
 							>
-								<GalleryCard
-									isAccessible
-									isEager
-									onOpen={() => openPreview(originalIndex)}
-									originalIndex={originalIndex}
-									src={src}
-									title={title}
-								/>
+									<GalleryCard
+										isAccessible
+										isEager
+										onOpen={() => openPreview(originalIndex)}
+										originalIndex={originalIndex}
+										src={images[originalIndex]}
+										thumbnailSrc={src}
+										title={title}
+									/>
 							</div>
 						))}
 					</div>
@@ -779,7 +847,8 @@ export function SiteDetailGallery({
 												isEager={isInitiallyVisible}
 												onOpen={() => openPreview(originalIndex)}
 												originalIndex={originalIndex}
-												src={src}
+												src={images[originalIndex]}
+												thumbnailSrc={galleryThumbnails[originalIndex]}
 												title={title}
 											/>
 										);
@@ -842,10 +911,11 @@ export function SiteDetailGallery({
 
 			<Modal>
 				<Modal.Backdrop
+					ref={previewBackdropRef}
 					isDismissable
-					isOpen={previewIndex !== null}
+					isOpen={isPreviewOpen}
 					onOpenChange={(open) => {
-						if (!open) setPreviewIndex(null);
+						if (!open) setIsPreviewOpen(false);
 					}}
 					className="z-1000"
 				>
@@ -857,10 +927,12 @@ export function SiteDetailGallery({
 							<Modal.Body className="m-0! p-0!">
 								<div
 									ref={viewerStageRef}
+									inert={!isPreviewOpen}
 									data-dragging="false"
 									data-zoomed="false"
 									className="relative flex h-dvh min-h-80 cursor-default select-none items-center justify-center overflow-hidden bg-transparent px-3 pt-12 pb-32 data-[dragging=true]:cursor-grabbing data-[zoomed=true]:cursor-grab sm:px-8 sm:pt-8 sm:pb-36"
 									onDoubleClick={(event) => {
+										if (!isPreviewOpen) return;
 										if (
 											(event.target as HTMLElement).closest("[data-viewer-ui]")
 										)
@@ -874,6 +946,7 @@ export function SiteDetailGallery({
 										);
 									}}
 									onPointerDown={(event) => {
+										if (!isPreviewOpen) return;
 										if (
 											(event.target as HTMLElement).closest("[data-viewer-ui]")
 										)
@@ -947,6 +1020,7 @@ export function SiteDetailGallery({
 										}
 									}}
 									onPointerMove={(event) => {
+										if (!isPreviewOpen) return;
 										if (!viewerPointersRef.current.has(event.pointerId)) return;
 										event.preventDefault();
 										viewerPointersRef.current.set(event.pointerId, {
@@ -1040,6 +1114,7 @@ export function SiteDetailGallery({
 										}));
 									}}
 									onPointerUp={(event) => {
+										if (!isPreviewOpen) return;
 										const swipe = viewerSwipeRef.current;
 										if (swipe?.pointerId === event.pointerId) {
 											const deltaX = swipe.currentX - swipe.startX;
@@ -1087,6 +1162,7 @@ export function SiteDetailGallery({
 										}
 									}}
 									onPointerCancel={(event) => {
+										if (!isPreviewOpen) return;
 										settleViewerSwipe();
 										viewerPointersRef.current.delete(event.pointerId);
 										viewerDragRef.current = null;
@@ -1106,7 +1182,7 @@ export function SiteDetailGallery({
 												viewerInteractionMovedRef.current = false;
 												return;
 											}
-											setPreviewIndex(null);
+											setIsPreviewOpen(false);
 										}}
 									/>
 									<Modal.CloseTrigger
@@ -1125,6 +1201,7 @@ export function SiteDetailGallery({
 											data-direction={viewerTransitionDirection}
 											draggable={false}
 											onLoad={() => {
+												if (!isPreviewOpen) return;
 												updateViewerLayout();
 												commitViewerTransform((current) => current);
 											}}
@@ -1180,6 +1257,7 @@ export function SiteDetailGallery({
 													className="w-full cursor-grab overflow-x-auto overscroll-x-contain px-1 py-1 [scrollbar-width:none] active:cursor-grabbing sm:px-1.5 sm:py-1.5 [&::-webkit-scrollbar]:hidden"
 													style={{ touchAction: "pan-x" }}
 													onWheel={(event) => {
+														if (!isPreviewOpen) return;
 														event.stopPropagation();
 														if (
 															Math.abs(event.deltaX) >= Math.abs(event.deltaY)
@@ -1192,6 +1270,7 @@ export function SiteDetailGallery({
 														});
 													}}
 													onPointerDown={(event) => {
+														if (!isPreviewOpen) return;
 														if (
 															event.button !== 0 ||
 															event.pointerType !== "mouse"
@@ -1212,6 +1291,7 @@ export function SiteDetailGallery({
 														};
 													}}
 													onPointerMove={(event) => {
+														if (!isPreviewOpen) return;
 														const drag = viewerThumbnailDragRef.current;
 														if (!drag || drag.pointerId !== event.pointerId)
 															return;
@@ -1236,6 +1316,7 @@ export function SiteDetailGallery({
 															drag.scrollLeft - deltaX;
 													}}
 													onPointerUp={(event) => {
+														if (!isPreviewOpen) return;
 														const drag = viewerThumbnailDragRef.current;
 														if (!drag || drag.pointerId !== event.pointerId)
 															return;
@@ -1259,6 +1340,7 @@ export function SiteDetailGallery({
 														}
 													}}
 													onPointerCancel={(event) => {
+														if (!isPreviewOpen) return;
 														viewerThumbnailSuppressClickRef.current = false;
 														viewerThumbnailDragRef.current = null;
 														stopViewerThumbnailMomentum();
@@ -1300,14 +1382,13 @@ export function SiteDetailGallery({
 																		: "border-transparent opacity-70 hover:border-black/15 dark:hover:border-white/20"
 																}`}
 															>
-																{/* eslint-disable-next-line @next/next/no-img-element */}
-																<img
-																	src={src}
-																	alt=""
-																	draggable={false}
-																	className="h-full w-full object-cover"
-																/>
-															</button>
+															<ThumbnailImage
+																src={galleryThumbnails[index]}
+																fallbackSrc={src}
+																alt=""
+																className="h-full w-full object-cover"
+															/>
+														</button>
 														))}
 													</div>
 												</div>

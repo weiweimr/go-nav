@@ -65,11 +65,61 @@ async function compressPreviewImage(
 	}
 }
 
-function buildScreenshotSources(targetUrl: string): string[] {
+interface ScreenshotSource {
+	label: string;
+	/** 解析出可直接下载的图片地址；多数源返回固定地址，microlink 需先从 API 响应里取。 */
+	resolve: () => Promise<string>;
+}
+
+const MICROLINK_API_MAX_BYTES = 1024 * 1024;
+
+function buildScreenshotSources(targetUrl: string): ScreenshotSource[] {
 	const encoded = encodeURIComponent(targetUrl);
+	const requestImage = (url: string) =>
+		fetchPublicResource(url, {
+			method: "GET",
+			timeoutMs: REQUEST_TIMEOUT,
+			maxBytes: MAX_PREVIEW_SIZE,
+			headers: {
+				"User-Agent":
+					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+			},
+		});
+
 	return [
-		`https://image.thum.io/get/width/1366/crop/860/noanimate/${targetUrl}`,
-		`https://s.wordpress.com/mshots/v1/${encoded}?w=1366`,
+		{
+			label: "thum.io",
+			resolve: async () =>
+				`https://image.thum.io/get/width/1366/crop/860/noanimate/${targetUrl}`,
+		},
+		{
+			label: "mshots",
+			resolve: async () =>
+				`https://s.wordpress.com/mshots/v1/${encoded}?w=1366`,
+		},
+		{
+			label: "microlink",
+			resolve: async () => {
+				const apiUrl =
+					`https://api.microlink.io/?url=${encoded}` +
+					`&screenshot=true&meta=false` +
+					`&viewport.width=1366&viewport.height=860`;
+				const res = await requestImage(apiUrl);
+				if (!res.ok) throw new Error(`microlink HTTP ${res.status}`);
+				const bytes = await readResponseBytes(res, MICROLINK_API_MAX_BYTES);
+				const payload = JSON.parse(
+					new TextDecoder("utf-8", { fatal: false }).decode(bytes),
+				) as {
+					status?: string;
+					data?: { screenshot?: { url?: string } };
+				};
+				const imageUrl = payload?.data?.screenshot?.url;
+				if (payload?.status !== "success" || !imageUrl) {
+					throw new Error("microlink 未返回截图地址");
+				}
+				return imageUrl;
+			},
+		},
 	];
 }
 
@@ -116,11 +166,12 @@ export async function POST(req: Request) {
 		const targetUrl = await normalizeTargetUrl(body.url);
 		const candidates = buildScreenshotSources(targetUrl);
 		const imageUpload = readNav().imageUpload;
-		let lastError = "截图失败";
+		const failures: string[] = [];
 
 		for (const source of candidates) {
 			try {
-				const { bytes, contentType } = await tryFetchImage(source);
+				const imageUrl = await source.resolve();
+				const { bytes, contentType } = await tryFetchImage(imageUrl);
 				const prepared =
 					imageUpload?.compress === true
 						? await compressPreviewImage(bytes, contentType)
@@ -144,12 +195,14 @@ export async function POST(req: Request) {
 				);
 				return NextResponse.json({ url });
 			} catch (e) {
-				lastError = (e as Error).message || lastError;
+				failures.push(`${source.label}: ${(e as Error).message || "失败"}`);
 			}
 		}
 
 		return NextResponse.json(
-			{ error: `获取首屏截图失败：${lastError}` },
+			{
+				error: `获取首屏截图失败（目标站点可能启用了机器验证），${failures.join("；")}`,
+			},
 			{ status: 400 },
 		);
 	} catch (e) {

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getNav, getWebsiteData } from "@/lib/config";
+import { resolveSiteOrigin } from "@/lib/seo";
 import { collectSiteDetailEntries } from "@/lib/site-detail";
 
 export const dynamic = "force-static";
@@ -42,17 +43,4 @@ export default function sitemap(): MetadataRoute.Sitemap {
 	}
 
 	return urls;
-}
-
-function resolveSiteOrigin(): string {
-	const raw =
-		process.env.NEXT_PUBLIC_SITE_URL ||
-		process.env.SITE_URL ||
-		"https://nav.gotab.cn";
-	try {
-		const url = new URL(raw);
-		return url.origin;
-	} catch {
-		return "https://nav.gotab.cn";
-	}
 }

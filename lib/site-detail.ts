@@ -13,6 +13,8 @@ const SITE_DETAIL_BASE_PATH = "/site";
 
 export const MAX_SITE_DETAIL_PREVIEW_IMAGES = 8;
 
+export const MAX_RELATED_SITE_RECOMMENDATIONS = 6;
+
 /**
  * 清理详情页多图配置。运行时 JSON 可能绕过 TypeScript，因此这里仍做类型检查。
  */
@@ -133,6 +135,47 @@ function slugify(value: string): string {
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "")
 		.replace(/-{2,}/g, "-");
+}
+
+/**
+ * 从同一分类中挑选相关推荐（排除当前站点自身）。
+ *
+ * 使用以 slug 与 batch 为种子的确定性洗牌，而不是 Math.random()：
+ * - 静态导出与客户端首屏渲染结果一致，避免 hydration 不匹配；
+ * - 不同详情页因种子不同得到不同的推荐组合，视觉上是"随机"的；
+ * - 点击"换一批"递增 batch 即可在客户端换一组，不改变服务端产物。
+ */
+export function pickRelatedSiteEntries(
+	entries: SiteDetailEntry[],
+	current: SiteDetailEntry,
+	limit = MAX_RELATED_SITE_RECOMMENDATIONS,
+	batch = 0,
+): SiteDetailEntry[] {
+	const candidates = entries.filter(
+		(item) =>
+			item.slug !== current.slug && item.categoryId === current.categoryId,
+	);
+	if (candidates.length === 0) return [];
+
+	const seed = parseInt(stableHash(`${current.slug}|${batch}`), 36) >>> 0;
+	const shuffled = seededShuffle(candidates, seed);
+	return shuffled.slice(0, Math.max(0, limit));
+}
+
+/** Fisher-Yates 洗牌，随机数由确定性种子生成。 */
+function seededShuffle<T>(items: T[], seed: number): T[] {
+	const result = [...items];
+	let state = seed || 1;
+	for (let i = result.length - 1; i > 0; i--) {
+		// xorshift32
+		state ^= state << 13;
+		state ^= state >>> 17;
+		state ^= state << 5;
+		state >>>= 0;
+		const j = state % (i + 1);
+		[result[i], result[j]] = [result[j], result[i]];
+	}
+	return result;
 }
 
 function extractSlugHash(slug: string): string {

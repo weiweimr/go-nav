@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { AppLayout } from "@/components/app-layout";
+import { AppLayoutHtml } from "@/components/app-layout/app-layout-html";
 import { RuntimeDocumentConfig } from "@/components/runtime-document-config";
 import { RuntimeLoadingScreen } from "@/components/runtime-loading-screen";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -94,7 +94,7 @@ export function RuntimeSiteShell() {
 				<Suspense
 					fallback={<RuntimeLoadingScreen message="正在加载页面…" />}
 				>
-					<AppLayout deploymentMode="html" />
+					<AppLayoutHtml />
 				</Suspense>
 			</SiteStoreProvider>
 		</ThemeProvider>

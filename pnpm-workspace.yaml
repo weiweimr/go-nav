@@ -5,7 +5,9 @@ confirmModulesPurge: false
 verifyDepsBeforeRun: false
 
 overrides:
-  '@codemirror/view': 6.43.10
+  # CodeMirror 的状态和视图模块需统一版本，避免多份实例导致类型或扩展冲突。
+  '@codemirror/state': 6.7.6
+  '@codemirror/view': 6.43.15
 
 allowBuilds:
   sharp: true
@@ -17,4 +19,22 @@ minimumReleaseAgeExclude:
   - '@codemirror/view@6.43.8'
   - '@heroui/react@3.2.5'
   - '@heroui/styles@3.2.5'
-  - pinyin-pro@3.29.4
+  - pinyin-pro@3.29.4 || 3.29.5
+  - '@codemirror/language@6.13.1'
+  - '@codemirror/streamparser@6.0.0'
+  - '@tailwindcss/node@4.3.5'
+  - '@tailwindcss/oxide-android-arm64@4.3.5'
+  - '@tailwindcss/oxide-darwin-arm64@4.3.5'
+  - '@tailwindcss/oxide-darwin-x64@4.3.5'
+  - '@tailwindcss/oxide-freebsd-x64@4.3.5'
+  - '@tailwindcss/oxide-linux-arm-gnueabihf@4.3.5'
+  - '@tailwindcss/oxide-linux-arm64-gnu@4.3.5'
+  - '@tailwindcss/oxide-linux-arm64-musl@4.3.5'
+  - '@tailwindcss/oxide-linux-x64-gnu@4.3.5'
+  - '@tailwindcss/oxide-linux-x64-musl@4.3.5'
+  - '@tailwindcss/oxide-wasm32-wasi@4.3.5'
+  - '@tailwindcss/oxide-win32-arm64-msvc@4.3.5'
+  - '@tailwindcss/oxide-win32-x64-msvc@4.3.5'
+  - '@tailwindcss/oxide@4.3.5'
+  - '@tailwindcss/postcss@4.3.5'
+  - tailwindcss@4.3.5

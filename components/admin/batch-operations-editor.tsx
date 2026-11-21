@@ -92,9 +92,13 @@ const UPDATE_FIELD_OPTIONS: Array<{
 	{ value: "previewImage", label: "预览图" },
 ];
 
-const DEFAULT_UPDATE_FIELDS = UPDATE_FIELD_OPTIONS.map(
-	(option) => option.value,
-);
+// 预览图默认不批量抓取：批量抓图会一次性存入大量截图，占用图床存储与流量。
+// 如需预览图，请到站点编辑里用「抓取预览图」按钮按需单独抓取。
+const DEFAULT_UPDATE_FIELDS: BatchUpdateField[] = [
+	"title",
+	"description",
+	"icon",
+];
 
 const TABLE_COLUMN_WIDTHS = {
 	icon: 60,
@@ -789,7 +793,7 @@ export function BatchOperationsEditor() {
 								width: "calc(100% - 24px)",
 							}}
 						>
-							待开始更新，在更新前，请在下方筛选您要更新的信息范围：名称、描述、图标、预览图！
+							待开始更新，在更新前，请在下方筛选您要更新的信息范围：名称、描述、图标、预览图。预览图默认不批量抓取以节省存储，如需可在站点编辑中单独抓取！
 						</span>
 					</>
 				)}
