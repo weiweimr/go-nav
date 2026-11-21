@@ -32,8 +32,7 @@ export function useSiteCardNavigation({
 	const store = useStore();
 	const detailHref = useMemo(() => buildSiteDetailPath(site), [site]);
 	const useDetailPage = layout?.enableSiteDetailPage === true;
-	const target =
-		useDetailPage || layout?.linkTarget === "current" ? undefined : "_blank";
+	const target = layout?.linkTarget === "current" ? undefined : "_blank";
 	const rel = target ? "noopener noreferrer" : undefined;
 	const preferredHref = useMemo(
 		() =>
@@ -47,10 +46,11 @@ export function useSiteCardNavigation({
 		[layout?.autoUseIntranet, site, siteLinkMode],
 	);
 	const href = useDetailPage ? detailHref : preferredHref;
+	/** 目标网址本身，供「直达」图标在无 JS / 中键 / 新标签场景兜底。 */
+	const directHref = preferredHref;
 
-	const handleClick = useCallback(
+	const openDirect = useCallback(
 		(event: MouseEvent<HTMLAnchorElement>) => {
-			if (useDetailPage) return;
 			const isModifiedClick =
 				event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
@@ -68,13 +68,24 @@ export function useSiteCardNavigation({
 				autoUseIntranet: layout?.autoUseIntranet,
 			});
 		},
-		[
-			layout?.autoUseIntranet,
-			layout?.linkTarget,
-			site,
-			trackVisit,
-			useDetailPage,
-		],
+		[layout?.autoUseIntranet, layout?.linkTarget, site, trackVisit],
+	);
+
+	const handleClick = useCallback(
+		(event: MouseEvent<HTMLAnchorElement>) => {
+			if (useDetailPage) return;
+			openDirect(event);
+		},
+		[openDirect, useDetailPage],
+	);
+
+	/** 详情页卡片上的「直达」图标：无论是否启用详情页，都直接打开目标网址。 */
+	const handleDirectClick = useCallback(
+		(event: MouseEvent<HTMLAnchorElement>) => {
+			event.stopPropagation();
+			openDirect(event);
+		},
+		[openDirect],
 	);
 
 	const handleAuxClick = useCallback(
@@ -104,6 +115,27 @@ export function useSiteCardNavigation({
 		],
 	);
 
+	const handleDirectAuxClick = useCallback(
+		(event: MouseEvent<HTMLAnchorElement>) => {
+			event.stopPropagation();
+			if (event.button !== 1) return;
+
+			event.preventDefault();
+			if (trackVisit) {
+				recordVisit(site as NavSite);
+			}
+			void openSiteWithPreference(
+				site,
+				{
+					linkTarget: layout?.linkTarget,
+					autoUseIntranet: layout?.autoUseIntranet,
+				},
+				{ forceNewTab: true },
+			);
+		},
+		[layout?.autoUseIntranet, layout?.linkTarget, site, trackVisit],
+	);
+
 	const handleDetailNavigate = useCallback(
 		(event: MouseEvent<HTMLAnchorElement>) => {
 			if (!useDetailPage) return;
@@ -128,6 +160,9 @@ export function useSiteCardNavigation({
 		handleAuxClick,
 		handleClick,
 		handleDetailNavigate,
+		handleDirectAuxClick,
+		handleDirectClick,
+		directHref,
 		href,
 		rel,
 		target,

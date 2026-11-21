@@ -17,12 +17,16 @@ export interface SiteCardData {
 export interface SiteCardNavigationModel {
 	detailHref: string;
 	href: string;
+	/** 目标网址（区别于详情页地址），用于直达图标的 href 兜底。 */
+	directHref: string;
 	rel?: string;
 	target?: string;
 	useDetailPage: boolean;
 	handleClick: MouseEventHandler<HTMLAnchorElement>;
 	handleAuxClick: MouseEventHandler<HTMLAnchorElement>;
 	handleDetailNavigate: MouseEventHandler<HTMLAnchorElement>;
+	handleDirectClick: MouseEventHandler<HTMLAnchorElement>;
+	handleDirectAuxClick: MouseEventHandler<HTMLAnchorElement>;
 }
 
 export interface SiteCardVisualProps {
