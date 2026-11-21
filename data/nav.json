@@ -79,5 +79,14 @@
   "imageUpload": {
     "compress": true,
     "convertToWebp": false
+  },
+  "imageThumbnail": {
+    "enabled": true,
+    "hosts": [
+      "t.wainiu.cn"
+    ],
+    "quality": 80,
+    "galleryWidth": 640,
+    "cardWidth": 480
   }
 }
