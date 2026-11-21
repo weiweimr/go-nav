@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
+import { collectCategoryPageEntries } from "@/lib/category-pages";
 import { getNav, getWebsiteData } from "@/lib/config";
+import { getDataLastModified } from "@/lib/data-meta";
 import { resolveSiteOrigin } from "@/lib/seo";
 import { collectSiteDetailEntries } from "@/lib/site-detail";
 
@@ -7,11 +9,11 @@ export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
 	const origin = resolveSiteOrigin();
-	const now = new Date();
+	const lastModified = getDataLastModified();
 	const home: MetadataRoute.Sitemap = [
 		{
 			url: `${origin}/`,
-			lastModified: now,
+			lastModified,
 			changeFrequency: "daily",
 			priority: 1,
 		},
@@ -33,10 +35,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
 		: [];
 	const urls = home;
 
+	for (const category of collectCategoryPageEntries(websiteData.categories)) {
+		urls.push({
+			url: `${origin}${category.path}/`,
+			lastModified,
+			changeFrequency: "weekly",
+			priority: 0.8,
+		});
+	}
+
 	for (const entry of detailEntries) {
 		urls.push({
 			url: `${origin}${entry.path}/`,
-			lastModified: now,
+			lastModified,
 			changeFrequency: "weekly",
 			priority: 0.7,
 		});

@@ -7,6 +7,8 @@ export interface SiteDetailEntry {
 	categoryId: string;
 	categoryName: string;
 	categoryPath: string[];
+	/** 与 categoryPath 一一对应的分类 id，用于生成可见/结构化面包屑链接。 */
+	categoryAncestorIds: string[];
 }
 
 const SITE_DETAIL_BASE_PATH = "/site";
@@ -76,9 +78,10 @@ export function collectSiteDetailEntries(
 	const list: SiteDetailEntry[] = [];
 	const seen = new Set<string>();
 
-	const walk = (nodes: NavCategory[], parents: string[]) => {
+	const walk = (nodes: NavCategory[], parents: string[], parentIds: string[]) => {
 		for (const node of nodes) {
 			const currentPath = [...parents, node.name];
+			const currentIds = [...parentIds, node.id];
 			if (node.sites && node.sites.length > 0) {
 				for (const site of node.sites) {
 					const slug = buildSiteDetailSlug(site);
@@ -91,16 +94,17 @@ export function collectSiteDetailEntries(
 						categoryId: node.id,
 						categoryName: node.name,
 						categoryPath: currentPath,
+						categoryAncestorIds: currentIds,
 					});
 				}
 			}
 			if (node.children && node.children.length > 0) {
-				walk(node.children, currentPath);
+				walk(node.children, currentPath, currentIds);
 			}
 		}
 	};
 
-	walk(categories, []);
+	walk(categories, [], []);
 	return list;
 }
 

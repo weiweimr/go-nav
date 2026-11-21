@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import type { NavCategory, NavConfig } from "@/types";
+import type { NavCategory, NavConfig, NavSite } from "@/types";
+import {
+	buildCategoryPath,
+	getCategoryAncestors,
+	type CategoryPageEntry,
+} from "@/lib/category-pages";
 import {
 	collectSiteDetailEntries,
 	resolveSiteDetailPreviewImages,
@@ -204,6 +209,8 @@ export function buildDetailMetadata(
 			images: (images.length > 0 ? images : [defaultOgImage()]).map((url) => ({
 				url,
 				alt: entry.site.title,
+				width: 1280,
+				height: 900,
 			})),
 		},
 		twitter: {
@@ -270,6 +277,9 @@ function detailWebPageJsonLd(nav: SeoNav, entry: SiteDetailEntry) {
 			"@type": "ListItem",
 			position: index + 2,
 			name,
+			item: `${origin}${withTrailingSlash(
+				buildCategoryPath(entry.categoryAncestorIds[index] ?? name),
+			)}`,
 		})),
 		{
 			"@type": "ListItem",
@@ -299,12 +309,15 @@ function detailWebPageJsonLd(nav: SeoNav, entry: SiteDetailEntry) {
 		},
 		image: images.length > 0 ? images : undefined,
 		mainEntity: {
-			"@type": "Thing",
+			"@type": "SoftwareApplication",
 			"@id": `${url}#site`,
 			name: entry.site.title,
 			description: entry.site.description?.trim() || description,
 			url: entry.site.url,
 			sameAs: entry.site.url,
+			applicationCategory: "WebApplication",
+			operatingSystem: "Web",
+			image: images[0] ?? undefined,
 		},
 	};
 }
@@ -336,4 +349,119 @@ export function buildHomeJsonLd(nav: SeoNav, categories: NavCategory[]) {
 
 export function buildDetailJsonLd(nav: SeoNav, entry: SiteDetailEntry) {
 	return buildJsonLd([webSiteJsonLd(nav), detailWebPageJsonLd(nav, entry)]);
+}
+
+function categoryDescription(nav: SeoNav, entry: CategoryPageEntry): string {
+	const configured = entry.description?.trim();
+	if (configured) return truncate(configured, 160);
+	return truncate(
+		`${entry.name}分类收录了 ${siteName(nav)} 的 ${entry.siteCount} 个精选站点，集中发现相关工具、服务与优质网址。`,
+		160,
+	);
+}
+
+export function buildCategoryMetadata(
+	nav: SeoNav,
+	entry: CategoryPageEntry,
+): Metadata {
+	const name = siteName(nav);
+	const title = `${entry.name} - ${name}`;
+	const description = categoryDescription(nav, entry);
+	const canonical = withTrailingSlash(entry.path);
+	const keywords = normalizeKeywords([
+		entry.name,
+		...(entry.category.sites ?? []).flatMap((site) => site.tags ?? []).slice(0, 8),
+	]);
+
+	return {
+		title,
+		description,
+		keywords: keywords.length > 0 ? keywords : undefined,
+		alternates: { canonical },
+		openGraph: {
+			type: "website",
+			locale: "zh_CN",
+			url: canonical,
+			siteName: name,
+			title,
+			description,
+			images: [{ url: defaultOgImage(), alt: name }],
+		},
+		twitter: {
+			card: "summary_large_image",
+			title,
+			description,
+			images: [defaultOgImage()],
+		},
+		robots: robotsPolicy(nav),
+	};
+}
+
+function categoryCollectionJsonLd(
+	nav: SeoNav,
+	entry: CategoryPageEntry,
+	allEntries: CategoryPageEntry[],
+	sites: NavSite[],
+) {
+	const origin = resolveSiteOrigin();
+	const url = `${origin}${withTrailingSlash(entry.path)}`;
+	const ancestors = getCategoryAncestors(allEntries, entry);
+	const breadcrumb = [
+		{
+			"@type": "ListItem",
+			position: 1,
+			name: siteName(nav),
+			item: `${origin}/`,
+		},
+		...ancestors.map((item, index) => ({
+			"@type": "ListItem",
+			position: index + 2,
+			name: item.name,
+			item: `${origin}${withTrailingSlash(item.path)}`,
+		})),
+	];
+
+	return {
+		"@context": "https://schema.org",
+		"@type": "CollectionPage",
+		"@id": `${url}#webpage`,
+		url,
+		name: `${entry.name} - ${siteName(nav)}`,
+		description: categoryDescription(nav, entry),
+		inLanguage: "zh-CN",
+		isPartOf: {
+			"@type": "WebSite",
+			"@id": `${origin}/#website`,
+			url: `${origin}/`,
+			name: siteName(nav),
+		},
+		breadcrumb: {
+			"@type": "BreadcrumbList",
+			itemListElement: breadcrumb,
+		},
+		mainEntity: {
+			"@type": "ItemList",
+			"@id": `${url}#sites`,
+			name: `${entry.name}站点列表`,
+			numberOfItems: sites.length,
+			itemListElement: sites.map((site, index) => ({
+				"@type": "ListItem",
+				position: index + 1,
+				name: site.title,
+				url: site.url,
+			})),
+		},
+	};
+}
+
+export function buildCategoryJsonLd(
+	nav: SeoNav,
+	entry: CategoryPageEntry,
+	allEntries: CategoryPageEntry[],
+	sites: NavSite[],
+) {
+	return buildJsonLd([
+		webSiteJsonLd(nav),
+		categoryCollectionJsonLd(nav, entry, allEntries, sites),
+	]);
 }

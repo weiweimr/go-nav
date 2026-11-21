@@ -1,11 +1,17 @@
 "use client";
 
 import { Button, Chip } from "@heroui/react";
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
-import { BiArrowBack, BiLinkExternal, BiRefresh } from "react-icons/bi";
+import {
+	BiArrowBack,
+	BiChevronRight,
+	BiLinkExternal,
+	BiRefresh,
+} from "react-icons/bi";
 import { usePageNavigation } from "@/components/page-navigation";
 import { SiteCard } from "@/components/site-card";
+import { buildCategoryPath } from "@/lib/category-pages";
 import type { LayoutConfig } from "@/types";
 import { recordVisit } from "@/hooks/use-recent-visits";
 import {
@@ -42,16 +48,30 @@ export function SiteDetailPage({
 	const previewImages = resolveSiteDetailPreviewImages(site);
 	const detailMarkdown = site.detailMarkdown?.trim() ?? "";
 	const detailIconLayout = { ...layout, iconBorderRadius: "12px" };
+	const allEntries = useMemo(
+		() => collectSiteDetailEntries(categories),
+		[categories],
+	);
 	const relatedEntries = useMemo(
 		() =>
 			pickRelatedSiteEntries(
-				collectSiteDetailEntries(categories),
+				allEntries,
 				entry,
 				MAX_RELATED_SITE_RECOMMENDATIONS,
 				relatedBatch,
 			),
-		[categories, entry, relatedBatch],
+		[allEntries, entry, relatedBatch],
 	);
+	const siblingEntries = useMemo(
+		() => allEntries.filter((item) => item.categoryId === entry.categoryId),
+		[allEntries, entry.categoryId],
+	);
+	const siblingIndex = siblingEntries.findIndex((item) => item.slug === entry.slug);
+	const previousEntry = siblingIndex > 0 ? siblingEntries[siblingIndex - 1] : null;
+	const nextEntry =
+		siblingIndex >= 0 && siblingIndex < siblingEntries.length - 1
+			? siblingEntries[siblingIndex + 1]
+			: null;
 
 	const handleBack = useCallback(() => {
 		requestHomeRestore();
@@ -68,7 +88,7 @@ export function SiteDetailPage({
 
 	return (
 		<section className="w-full px-2 pb-6">
-			<div className="mb-4 flex items-center gap-3">
+			<div className="mb-3 flex items-center gap-3">
 				<Button
 					isIconOnly
 					variant="tertiary"
@@ -81,6 +101,33 @@ export function SiteDetailPage({
 					网址详情
 				</h2>
 			</div>
+
+			<nav
+				aria-label="面包屑导航"
+				className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400"
+			>
+				<a href="/" className="hover:text-primary hover:underline">
+					首页
+				</a>
+				{entry.categoryPath.map((name, index) => {
+					const id = entry.categoryAncestorIds[index] ?? name;
+					return (
+						<Fragment key={`${id}-${index}`}>
+							<BiChevronRight className="size-3.5 shrink-0" aria-hidden />
+							<a
+								href={`${buildCategoryPath(id)}/`}
+								className="hover:text-primary hover:underline"
+							>
+								{name}
+							</a>
+						</Fragment>
+					);
+				})}
+				<BiChevronRight className="size-3.5 shrink-0" aria-hidden />
+				<span className="truncate text-zinc-700 dark:text-zinc-300">
+					{site.title}
+				</span>
+			</nav>
 
 			<div className="space-y-4">
 				<div className="rounded-2xl border border-black/10 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-zinc-900">
@@ -136,9 +183,26 @@ export function SiteDetailPage({
 									<span className="text-xs text-zinc-500 dark:text-zinc-400">
 										分类
 									</span>
-									<p className="mt-1.5 text-sm leading-6 text-zinc-800 dark:text-zinc-200">
-										{entry.categoryPath.join(" / ")}
-									</p>
+									<div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-6 text-zinc-800 dark:text-zinc-200">
+										{entry.categoryPath.map((name, index) => {
+											const id = entry.categoryAncestorIds[index] ?? name;
+											return (
+												<Fragment key={`field-${id}-${index}`}>
+													{index > 0 ? (
+														<span className="text-zinc-400 dark:text-zinc-500">
+															/
+														</span>
+													) : null}
+													<a
+														href={`${buildCategoryPath(id)}/`}
+														className="underline-offset-4 hover:text-primary hover:underline"
+													>
+														{name}
+													</a>
+												</Fragment>
+											);
+										})}
+									</div>
 								</div>
 								<div className="flex min-w-0 items-end sm:justify-end">
 									<Button variant="primary" onPress={handleVisit}>
@@ -222,6 +286,44 @@ export function SiteDetailPage({
 							))}
 						</div>
 					</div>
+				) : null}
+
+				{siblingEntries.length > 1 ? (
+					<nav
+						aria-label="同类站点导航"
+						className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white p-4 text-sm dark:border-white/10 dark:bg-zinc-900"
+					>
+						{previousEntry ? (
+							<a
+								href={`${previousEntry.path}/`}
+								className="inline-flex min-w-0 items-center gap-1.5 text-zinc-600 hover:text-primary dark:text-zinc-300"
+							>
+								<BiArrowBack className="size-4 shrink-0" aria-hidden />
+								<span className="text-xs text-zinc-400 dark:text-zinc-500">
+									上一个
+								</span>
+								<span className="truncate font-medium">
+									{previousEntry.site.title}
+								</span>
+							</a>
+						) : (
+							<span />
+						)}
+						{nextEntry ? (
+							<a
+								href={`${nextEntry.path}/`}
+								className="inline-flex min-w-0 items-center gap-1.5 text-zinc-600 hover:text-primary dark:text-zinc-300"
+							>
+								<span className="text-xs text-zinc-400 dark:text-zinc-500">
+									下一个
+								</span>
+								<span className="truncate font-medium">
+									{nextEntry.site.title}
+								</span>
+								<BiChevronRight className="size-4 shrink-0" aria-hidden />
+							</a>
+						) : null}
+					</nav>
 				) : null}
 			</div>
 		</section>

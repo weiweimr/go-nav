@@ -1,7 +1,12 @@
 "use client";
 import dynamic from "next/dynamic";
+import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useAtomValue, useSetAtom } from "jotai";
+import {
+	collectCategoryPageEntries,
+	findCategoryPageEntryBySlug,
+} from "@/lib/category-pages";
 import { HeaderBundle } from "./header-bundle";
 import { AppSidebar } from "./app-sidebar";
 import { AppFooter } from "./app-footer";
@@ -31,6 +36,7 @@ import {
     submissionConfigAtom,
 } from "@/lib/store/site";
 import { AppLayoutHomeContent } from "./app-layout/app-layout-home-content";
+import { CategoryPage } from "./app-layout/category-page";
 import { useAppLayoutView } from "./app-layout/use-app-layout-view";
 import { useHomeRouteState } from "./app-layout/use-home-route-state";
 import { PageEmptyState } from "./ui/empty-state-blocks";
@@ -99,9 +105,34 @@ export function AppLayout({
 			detailSlugOverride,
 			setActiveId,
 		});
+	const categorySlug = useMemo(() => {
+		if (!pathname.startsWith("/category/")) return null;
+		const raw = pathname.slice("/category/".length).split("/")[0];
+		if (!raw) return null;
+		try {
+			return decodeURIComponent(raw);
+		} catch {
+			return raw;
+		}
+	}, [pathname]);
+	const categoryEntries = useMemo(
+		() => collectCategoryPageEntries(categories),
+		[categories],
+	);
+	const selectedCategory = useMemo(
+		() =>
+			categorySlug
+				? findCategoryPageEntryBySlug(categoryEntries, categorySlug)
+				: null,
+		[categorySlug, categoryEntries],
+	);
 	const hasDesktopSidebar = layout.showSidebar && displayCategories.length > 0;
 	const hasVisibleHomeAds =
-		!selectedEntry && !isDetailRoute && homeAdsEnabled && homeAds.length > 0;
+		!selectedEntry &&
+		!selectedCategory &&
+		!isDetailRoute &&
+		homeAdsEnabled &&
+		homeAds.length > 0;
 
 	return (
 		<div className="flex min-h-dvh flex-col">
@@ -134,6 +165,13 @@ export function AppLayout({
 					>
 						{selectedEntry ? (
 							<SiteDetailPage entry={selectedEntry} layout={layout} />
+						) : selectedCategory ? (
+							<CategoryPage
+								entry={selectedCategory}
+								entries={categoryEntries}
+								layout={layout}
+								cardGrid={cardGrid}
+							/>
 						) : isDetailRoute ? (
 							<PageEmptyState
 								title="未找到该网址"
